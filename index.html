@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CubexTeam - Сервер MCPE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #39ff14;
+            --primary-glow: rgba(57, 255, 20, 0.5);
+            --bg-color: #080a08;
+            --glass-card: rgba(20, 20, 20, 0.6);
+            --glass-header: rgba(30, 30, 30, 0.2); 
+            --glass-border: rgba(255, 255, 255, 0.15); 
+            --text-main: #ffffff;
+            --text-muted: #bbb;
+            --danger: #ff3b3b;
+            --orange: #ff9d00;
+        }
+
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            outline: none;
+        }
+
+        /* --- ФИКС БАГОВ СКРОЛЛА --- */
+        html, body {
+            height: 100%;
+            width: 100%;
+            background-color: #080a08;
+            color: var(--text-main);
+            font-family: 'Montserrat', sans-serif;
+            overflow: hidden; /* Блокируем скролл страницы */
+            user-select: none;
+        }
+
+        /* Контейнер фона (НЕ ДВИГАЕТСЯ) */
+        .background-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .bg-fixed {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at 50% 30%, #152215 0%, #050505 100%);
+        }
+
+        .bg-pattern {
+            position: absolute;
+            top: -50%; left: -50%; width: 200%; height: 200%;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23555' font-size='20' font-family='sans-serif'%3E%E2%80%BB%3C/text%3E%3C/svg%3E");
+            background-size: 40px 40px;
+            opacity: 0.5; 
+            animation: bgScroll 10s linear infinite;
+            will-change: transform;
+            transform: translateZ(0); /* GPU */
+        }
+
+        @keyframes bgScroll {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(40px, 40px); }
+        }
+
+        .bg-vignette {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, transparent 30%, #000 140%);
+        }
+
+        /* --- ОБЛАСТЬ ПРОКРУТКИ (ЗДЕСЬ КОНТЕНТ) --- */
+        .scroll-wrapper {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            overflow-y: auto; /* Скролл только внутри */
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+            z-index: 1;
+        }
+
+        /* --- ЛОАДЕР --- */
+        #preloader {
+            position: fixed;
+            inset: 0;
+            background: #050505;
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.6s ease, visibility 0.6s ease;
+        }
+
+        .loader-container { position: relative; width: 80px; height: 80px; }
+
+        .loader-green {
+            position: absolute; inset: 0;
+            border-radius: 50%;
+            border: 4px solid transparent;
+            border-top-color: var(--primary);
+            border-bottom-color: var(--primary);
+            animation: spin 1.5s linear infinite;
+            box-shadow: 0 0 15px var(--primary-glow);
+        }
+
+        .loader-white {
+            position: absolute; inset: 0;
+            border-radius: 50%;
+            border: 4px solid transparent;
+            border-left-color: #fff;
+            border-right-color: #fff;
+            animation: spinReverse 1.5s linear infinite, pulseJoin 1.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        @keyframes spinReverse { 100% { transform: rotate(-360deg); } }
+        @keyframes pulseJoin { 0% { inset: 25px; } 100% { inset: 8px; } }
+
+        /* --- КОНТЕЙНЕР --- */
+        .container {
+            width: 100%;
+            max-width: 480px;
+            padding: 20px;
+            padding-top: 50px;
+            padding-bottom: 80px; /* Отступ снизу для скролла */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0 auto;
+            transform: translateZ(0);
+        }
+
+        @media (min-width: 768px) {
+            .container { max-width: 900px; padding-top: 80px; }
+            .logo-box { width: 180px !important; height: 180px !important; }
+            .logo-text { font-size: 80px !important; }
+            .title-main { font-size: 56px !important; }
+            .server-card { padding: 30px 40px !important; }
+            .social-btn { width: 64px !important; height: 64px !important; } 
+            .social-btn img { width: 40px !important; height: 40px !important; }
+            .header-glass { padding: 20px 30px !important; }
+            .ip-value { font-size: 22px !important; }
+            .donate-card { padding: 15px 30px !important; width: 60% !important; }
+        }
+
+        /* --- АНИМАЦИИ ПОЯВЛЕНИЯ --- */
+        .anim-item {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        body.loaded .anim-item {
+            animation: fadeInUp 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+
+        @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
+
+        .d1 { animation-delay: 0.1s; }
+        .d2 { animation-delay: 0.2s; }
+        .d3 { animation-delay: 0.3s; }
+        .d4 { animation-delay: 0.4s; }
+        .d5 { animation-delay: 0.5s; }
+        .d6 { animation-delay: 0.6s; }
+        .d7 { animation-delay: 0.7s; }
+        .d8 { animation-delay: 0.8s; }
+
+        /* --- СТИЛИ КАРТОЧЕК --- */
+        .header-glass {
+            width: 100%;
+            background: var(--glass-header);
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            transform: translateZ(0); /* Фикс */
+        }
+
+        .online-pill {
+            padding: 12px 24px;
+            display: flex; align-items: center; gap: 10px;
+            margin-bottom: 30px; width: auto; border-radius: 50px;
+        }
+
+        .dot { 
+            width: 8px; height: 8px; background: var(--primary); 
+            border-radius: 50%; box-shadow: 0 0 10px var(--primary); 
+            animation: pulse 2s infinite; 
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(57, 255, 20, 0.7); }
+            70% { box-shadow: 0 0 0 8px rgba(57, 255, 20, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(57, 255, 20, 0); }
+        }
+
+        .online-text { font-size: 14px; font-weight: 700; color: #fff; }
+        .online-num { color: var(--primary); margin-left: 5px; }
+
+        /* Shimmer Effects */
+        @keyframes textShimmer {
+            0% { background-position: 200% center; }
+            100% { background-position: -200% center; }
+        }
+        .shimmer-text {
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+            background-size: 200% auto; animation: textShimmer 4s linear infinite;
+        }
+        .shimmer-green { background-image: linear-gradient(to right, #fff 20%, var(--primary) 50%, #fff 80%); }
+        .shimmer-gray { background-image: linear-gradient(to right, #fff 20%, #777 50%, #fff 80%); }
+        .shimmer-white { background-image: linear-gradient(to right, rgba(255,255,255,0.3) 20%, #fff 50%, rgba(255,255,255,0.3) 80%); }
+        .shimmer-orange { background-image: linear-gradient(to right, rgba(255,255,255,0.9) 20%, var(--orange) 50%, rgba(255,255,255,0.9) 80%); }
+
+        .ip-box {
+            padding: 16px 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 40px;
+        }
+        .ip-value { font-weight: 700; font-size: 16px; letter-spacing: 0.5px; }
+
+        .copy-btn {
+            width: 40px; height: 40px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            border: 1px solid rgba(255,255,255,0.15);
+            cursor: pointer; position: relative; overflow: hidden; 
+            transition: transform 0.1s;
+        }
+        .copy-btn:active { transform: scale(0.9); border-color: var(--primary); }
+        .copy-btn svg { width: 18px; fill: #ccc; z-index: 2; position: relative; }
+
+        @keyframes glassShimmerEffect {
+            0% { transform: translateX(-150%) skewX(-20deg); opacity: 0; }
+            10% { opacity: 1; }
+            100% { transform: translateX(250%) skewX(-20deg); opacity: 0; }
+        }
+        .copy-btn::after {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            transform: translateX(-150%); pointer-events: none; z-index: 1;
+        }
+        .copy-btn.animating::after { animation: glassShimmerEffect 1.4s ease-out forwards; }
+
+        /* LOGO */
+        .logo-section { display: flex; flex-direction: column; align-items: center; margin-bottom: 40px; }
+        .logo-box {
+            width: 130px; height: 130px;
+            border-radius: 35px;
+            background: #050505;
+            border: 2px solid var(--primary);
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 20px;
+            box-shadow: 0 0 15px rgba(57, 255, 20, 0.1); 
+            position: relative;
+            transition: transform 0.2s cubic-bezier(0.1, 0.9, 0.2, 1);
+            cursor: pointer; overflow: hidden;
+            transform: translateZ(0);
+        }
+        .logo-box::after {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 50%;
+            background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 100%);
+            border-radius: 34px 34px 100% 100% / 30px 30px 20px 20px; pointer-events: none;
+        }
+        .logo-text { font-size: 60px; font-weight: 900; color: var(--primary); text-shadow: 0 0 10px var(--primary); z-index: 2; pointer-events: none; }
+        .title-main { font-size: 36px; font-weight: 900; text-transform: uppercase; text-shadow: 0 0 20px rgba(57, 255, 20, 0.3); margin-bottom: 5px; letter-spacing: 1px; }
+        .title-sub { font-size: 12px; color: var(--text-muted); font-weight: 600; letter-spacing: 3px; text-transform: uppercase; }
+
+        .servers-list { width: 100%; display: flex; flex-direction: column; gap: 15px; margin-bottom: 25px; }
+        
+        .server-card {
+            padding: 20px 24px;
+            display: flex; justify-content: space-between; align-items: center;
+            position: relative; overflow: hidden;
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), border-color 0.4s ease;
+            cursor: pointer; 
+            background: var(--glass-card);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            transform: translateZ(0);
+        }
+        
+        .server-card:hover { transform: scale(1.02) translateZ(0); border-color: rgba(57, 255, 20, 0.3); }
+        .server-card:active { transform: scale(1.05) translateZ(0); border-color: var(--primary); z-index: 10; }
+        
+        .server-card::before {
+            content: ''; position: absolute; left: 0; top: 20%; bottom: 20%; width: 3px;
+            background: var(--primary); box-shadow: 0 0 10px var(--primary); border-radius: 0 4px 4px 0;
+        }
+        .card-info h3 { font-size: 18px; font-weight: 800; text-transform: uppercase; margin-bottom: 4px; }
+        .card-info p { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+        .card-right { display: flex; align-items: center; gap: 10px; }
+
+        .status-badge {
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 8px 14px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 800;
+            color: #fff;
+            display: flex; align-items: center; gap: 8px;
+            min-width: 60px; justify-content: center;
+        }
+
+        .status-dot-mini {
+            width: 8px; height: 8px; border-radius: 50%; 
+            background: #555; transition: 0.3s;
+            border: 1px solid rgba(255,255,255,0.4);
+        }
+
+        @keyframes pulseGreen { 0% { box-shadow: 0 0 0 0 rgba(57, 255, 20, 0.7); } 70% { box-shadow: 0 0 0 6px rgba(57, 255, 20, 0); } 100% { box-shadow: 0 0 0 0 rgba(57, 255, 20, 0); } }
+        @keyframes pulseRed { 0% { box-shadow: 0 0 0 0 rgba(255, 59, 59, 0.7); } 70% { box-shadow: 0 0 0 6px rgba(255, 59, 59, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 59, 59, 0); } }
+
+        .status-badge.online .status-dot-mini { background: var(--primary); animation: pulseGreen 2s infinite; }
+        .status-badge.offline .status-dot-mini { background: var(--danger); animation: pulseRed 2s infinite; }
+
+        .play-circle {
+            width: 48px; height: 48px;
+            background: var(--primary);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 20px rgba(57, 255, 20, 0.6);
+            transition: transform 0.2s ease;
+            cursor: pointer; z-index: 20;
+        }
+        .play-circle:hover { transform: scale(1.1); }
+        .play-circle:active { transform: scale(0.95); }
+        .play-circle svg { width: 24px; height: 24px; fill: #000; display: block; }
+
+        .donate-card {
+            width: 100%;
+            padding: 10px 20px;
+            background: var(--glass-card);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            display: flex; justify-content: center; align-items: center;
+            margin-bottom: 40px; cursor: pointer;
+            text-decoration: none;
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            transform: translateZ(0);
+        }
+        .donate-card:hover { transform: scale(1.03) translateZ(0); }
+        .donate-card:active { transform: scale(1.05) translateZ(0); }
+        .donate-text { font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; }
+
+        .socials { display: flex; gap: 20px; margin-bottom: 30px; }
+        .social-btn {
+            background: transparent; border: none; width: 50px; height: 50px;
+            display: flex; align-items: center; justify-content: center;
+            transition: 0.3s; cursor: pointer; padding: 0;
+        }
+        .social-btn:active { transform: scale(0.9); }
+        .social-btn img { width: 48px; height: 48px; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); transition: 0.3s; }
+        .social-btn:hover img { filter: drop-shadow(0 0 10px rgba(255,255,255,0.4)); }
+
+        .copyright { font-size: 10px; font-weight: 600; text-align: center; letter-spacing: 0.5px; }
+
+        #toast {
+            visibility: hidden;
+            background: rgba(20, 20, 20, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            border-radius: 50px;
+            padding: 12px 24px;
+            position: fixed; z-index: 100;
+            bottom: 40px; left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            font-weight: 700; font-size: 12px;
+            opacity: 0; transition: all 0.3s;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        #toast.show { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    </style>
+</head>
+<body>
+
+    <!-- ФОН (ВНЕ СКРОЛЛА) -->
+    <div class="background-layer">
+        <div class="bg-fixed"></div>
+        <div class="bg-pattern"></div>
+        <div class="bg-vignette"></div>
+    </div>
+
+    <!-- ЛОАДЕР -->
+    <div id="preloader">
+        <div class="loader-container">
+            <div class="loader-green"></div>
+            <div class="loader-white"></div>
+        </div>
+    </div>
+
+    <!-- СКРОЛЛ ВРАППЕР -->
+    <div class="scroll-wrapper">
+        <div class="container">
+            
+            <div class="header-glass online-pill anim-item d1">
+                <div class="dot"></div>
+                <div class="online-text">
+                    <span class="shimmer-text shimmer-green">Общий онлайн:</span> 
+                    <span class="online-num" id="total-online">...</span>
+                </div>
+            </div>
+
+            <div class="header-glass ip-box anim-item d2">
+                <span class="ip-value">cubex.team:19132</span>
+                <div class="copy-btn" id="copyBtnMain" onclick="copyIp('cubex.team:19132', this)">
+                    <svg viewBox="0 0 24 24"><path d="M16 1H4C2.9 1 2 1.9 2 3V17H4V3H16V1ZM19 5H8C6.9 5 6 5.9 6 7V21C6 22.1 6.9 23 8 23H19C20.1 23 21 22.1 21 21V7C21 5.9 20.1 5 19 5ZM19 21H8V7H19V21Z"/></svg>
+                </div>
+            </div>
+
+            <div class="logo-section anim-item d3">
+                <div class="logo-box" id="logoBox">
+                    <span class="logo-text">CT</span>
+                </div>
+                <h1 class="title-main">CUBEXTEAM</h1>
+                <div class="title-sub">СЕРВЕР MCPE/BE</div>
+            </div>
+
+            <div class="servers-list">
+                <div class="server-card anim-item d4">
+                    <div class="card-info">
+                        <h3 class="shimmer-text shimmer-gray">Гриферство</h3>
+                        <p>Классическое выживание</p>
+                    </div>
+                    <div class="card-right">
+                        <div class="status-badge" id="status-19132">
+                            <div class="status-dot-mini"></div>
+                            <span class="status-txt">...</span>
+                        </div>
+                        <div class="play-circle" onclick="addToMinecraft('cubex.team', '19132', 'CubexTeam Griefer')">
+                             <svg viewBox="0 0 24 24"><path d="M8 6.82v10.36c0 .79.87 1.27 1.54.84l8.14-5.18c.62-.39.62-1.29 0-1.69L9.54 5.98C8.87 5.55 8 6.03 8 6.82z"/></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="server-card anim-item d5">
+                    <div class="card-info">
+                        <h3 class="shimmer-text shimmer-gray">Анархия</h3>
+                        <p>Полная свобода действий</p>
+                    </div>
+                    <div class="card-right">
+                        <div class="status-badge" id="status-19133">
+                            <div class="status-dot-mini"></div>
+                            <span class="status-txt">...</span>
+                        </div>
+                        <div class="play-circle" onclick="addToMinecraft('cubex.team', '19133', 'CubexTeam Anarchy')">
+                            <svg viewBox="0 0 24 24"><path d="M8 6.82v10.36c0 .79.87 1.27 1.54.84l8.14-5.18c.62-.39.62-1.29 0-1.69L9.54 5.98C8.87 5.55 8 6.03 8 6.82z"/></svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <a href="https://t.me/cubexteam" target="_blank" class="donate-card anim-item d6">
+                <span class="donate-text shimmer-text shimmer-orange">ДОНАТ</span>
+            </a>
+
+            <div class="socials anim-item d7">
+                <a href="https://t.me/cubexteam" target="_blank" class="social-btn">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg" alt="Telegram">
+                </a>
+                <a href="https://vk.com/cubexteam" target="_blank" class="social-btn">
+                   <img src="https://upload.wikimedia.org/wikipedia/commons/f/f3/VK_Compact_Logo_%282021-present%29.svg" alt="VK">
+                </a>
+            </div>
+
+            <div class="copyright anim-item d8">
+                <span class="shimmer-text shimmer-white">Code by SantianDev | 2026</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast">IP СКОПИРОВАН!</div>
+
+    <script>
+        function copyIp(text, btnElement) {
+            btnElement.classList.remove('animating');
+            void btnElement.offsetWidth;
+            btnElement.classList.add('animating');
+            setTimeout(() => { btnElement.classList.remove('animating'); }, 1400);
+
+            const tempInput = document.createElement("input");
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand("copy");
+            document.body.removeChild(tempInput);
+            showToast("IP СКОПИРОВАН!");
+        }
+
+        function addToMinecraft(ip, port, name) {
+            event.stopPropagation();
+            const url = `minecraft://?action=addServer&name=${encodeURIComponent(name)}&ip=${ip}&port=${port}`;
+            showToast("ОТКРЫВАЮ MINECRAFT...");
+            setTimeout(() => { window.location.href = url; }, 500);
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById("toast");
+            toast.innerText = msg;
+            toast.classList.add("show");
+            setTimeout(() => toast.classList.remove("show"), 2500);
+        }
+
+        const logoBox = document.getElementById('logoBox');
+        logoBox.addEventListener('mousedown', handleTilt);
+        logoBox.addEventListener('touchstart', handleTilt, {passive: false});
+
+        function handleTilt(e) {
+            const rect = logoBox.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const xPos = clientX - rect.left;
+            const width = rect.width;
+
+            if (xPos > width / 2) {
+                logoBox.style.transform = 'scale(1.05) rotate(-12deg)';
+            } else {
+                logoBox.style.transform = 'scale(1.05) rotate(12deg)';
+            }
+        }
+        ['mouseup', 'mouseleave', 'touchend'].forEach(evt => {
+            logoBox.addEventListener(evt, () => {
+                logoBox.style.transform = 'scale(1) rotate(0deg)';
+            });
+        });
+
+        window.addEventListener('load', function() {
+            fetchServerStatus();
+        });
+
+        async function fetchServerStatus() {
+            const ip = 'cubex.team';
+            const ports = [19132, 19133];
+            let totalPlayers = 0;
+            let loadedCount = 0;
+
+            const updateCard = (port, isOnline, players) => {
+                const badge = document.getElementById(`status-${port}`);
+                const txt = badge.querySelector('.status-txt');
+                
+                badge.classList.remove('online', 'offline');
+                
+                if (isOnline) {
+                    badge.classList.add('online');
+                    txt.innerText = players;
+                } else {
+                    badge.classList.add('offline');
+                    txt.innerText = "0";
+                }
+            };
+
+            for (let port of ports) {
+                try {
+                    const response = await fetch(`https://api.mcsrvstat.us/bedrock/2/${ip}:${port}`);
+                    const data = await response.json();
+                    
+                    if (data.online === true && data.players) {
+                        totalPlayers += data.players.online;
+                        updateCard(port, true, data.players.online);
+                    } else {
+                        updateCard(port, false, 0);
+                    }
+                } catch (e) {
+                    updateCard(port, false, 0);
+                } finally {
+                    loadedCount++;
+                    if (loadedCount === ports.length) {
+                        document.getElementById('total-online').innerText = totalPlayers;
+                        const preloader = document.getElementById('preloader');
+                        preloader.style.opacity = '0';
+                        document.body.classList.add('loaded');
+                        setTimeout(() => preloader.style.display = 'none', 600);
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
